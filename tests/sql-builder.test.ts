@@ -1,6 +1,7 @@
 import { describe, it, expect } from 'vitest'
 import {
   quoteIdentifier,
+  escapeLikePattern,
   buildLockClause,
   buildSelectClause,
   buildOrderByClause,
@@ -30,6 +31,24 @@ describe('quoteIdentifier', () => {
 
   it('escapes double quotes in identifiers', () => {
     expect(quoteIdentifier('table"name')).toBe('"table""name"')
+  })
+})
+
+describe('escapeLikePattern', () => {
+  it('escapes LIKE wildcard characters', () => {
+    expect(escapeLikePattern('50%')).toBe('50\\%')
+    expect(escapeLikePattern('_test')).toBe('\\_test')
+    expect(escapeLikePattern('test\\backslash')).toBe('test\\\\backslash')
+  })
+
+  it('escapes multiple wildcards', () => {
+    expect(escapeLikePattern('50%_test')).toBe('50\\%\\_test')
+    expect(escapeLikePattern('%_%')).toBe('\\%\\_\\%')
+  })
+
+  it('handles strings without wildcards', () => {
+    expect(escapeLikePattern('normal text')).toBe('normal text')
+    expect(escapeLikePattern('')).toBe('')
   })
 })
 
@@ -107,6 +126,16 @@ describe('buildOrderByClause', () => {
     expect(buildOrderByClause(userModel, [{ name: 'asc' }, { email: 'desc' }])).toBe(
       'ORDER BY "name" ASC, "email" DESC'
     )
+  })
+
+  it('builds multiple field order with dbName', () => {
+    expect(
+      buildOrderByClause(userModel, [
+        { createdAt: 'desc' },
+        { email: 'asc' },
+        { balance: 'desc' },
+      ])
+    ).toBe('ORDER BY "created_at" DESC, "email" ASC, "balance" DESC')
   })
 })
 
@@ -198,6 +227,40 @@ describe('buildWhereClause', () => {
     })
   })
 
+  it('escapes LIKE wildcards in string operators', () => {
+    expect(buildWhereClause(userModel, { email: { contains: '50%' } })).toEqual({
+      sql: '"email" LIKE $1',
+      params: ['%50\\%%'],
+    })
+    expect(buildWhereClause(userModel, { email: { startsWith: '_test' } })).toEqual({
+      sql: '"email" LIKE $1',
+      params: ['\\_test%'],
+    })
+    expect(buildWhereClause(userModel, { email: { endsWith: 'test\\' } })).toEqual({
+      sql: '"email" LIKE $1',
+      params: ['%test\\\\'],
+    })
+  })
+
+  it('handles empty in array', () => {
+    const result = buildWhereClause(userModel, { id: { in: [] } })
+    expect(result.sql).toBe('FALSE')
+    expect(result.params).toEqual([])
+  })
+
+  it('handles empty notIn array', () => {
+    const result = buildWhereClause(userModel, { id: { notIn: [] } })
+    // Empty notIn matches all rows, so no condition is added
+    expect(result.sql).toBe('')
+    expect(result.params).toEqual([])
+  })
+
+  it('throws error for unsupported mode: insensitive', () => {
+    expect(() => {
+      buildWhereClause(userModel, { email: { contains: 'test', mode: 'insensitive' } })
+    }).toThrow(/Case-insensitive mode is not supported/)
+  })
+
   it('handles AND operator', () => {
     const result = buildWhereClause(userModel, {
       AND: [{ id: 1 }, { email: 'test@example.com' }],
@@ -220,6 +283,23 @@ describe('buildWhereClause', () => {
     })
     expect(result.sql).toBe('NOT ("id" = $1)')
     expect(result.params).toEqual([1])
+  })
+
+  it('handles nested NOT with equals', () => {
+    const result = buildWhereClause(userModel, {
+      id: { not: { equals: 5 } },
+    })
+    expect(result.sql).toBe('"id" != $1')
+    expect(result.params).toEqual([5])
+  })
+
+  it('handles nested NOT with empty in array', () => {
+    const result = buildWhereClause(userModel, {
+      id: { not: { in: [] } },
+    })
+    // Empty array in NOT IN means match all rows, so no condition
+    expect(result.sql).toBe('')
+    expect(result.params).toEqual([])
   })
 
   it('uses dbName when available', () => {

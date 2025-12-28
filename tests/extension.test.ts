@@ -257,7 +257,6 @@ describe('prisma-lock-for-update extension', () => {
         data: { email: 'outside@example.com' },
       })
 
-      // @ts-expect-error - intentionally testing runtime error
       await expect(prisma.user.findUniqueForUpdate({ where: { id: user.id } }))
         .rejects.toThrow(/must be called within a transaction/)
     })
@@ -267,7 +266,6 @@ describe('prisma-lock-for-update extension', () => {
         data: { title: 'Test Task' },
       })
 
-      // @ts-expect-error - intentionally testing runtime error
       await expect(prisma.task.findFirstForUpdate({ where: { status: 'pending' } }))
         .rejects.toThrow(/must be called within a transaction/)
     })
@@ -277,7 +275,6 @@ describe('prisma-lock-for-update extension', () => {
         data: { title: 'Test Task' },
       })
 
-      // @ts-expect-error - intentionally testing runtime error
       await expect(prisma.task.findManyForUpdate({}))
         .rejects.toThrow(/must be called within a transaction/)
     })
@@ -460,6 +457,100 @@ describe('prisma-lock-for-update extension', () => {
       // The NOWAIT transaction should have failed with a lock error
       expect(nowaitError).toBeDefined()
       expect(nowaitError?.message).toMatch(/could not obtain lock|lock.*not.*available/i)
+    })
+  })
+
+  describe('edge cases', () => {
+    it('escapes LIKE wildcards in string operators', async () => {
+      await prisma.user.createMany({
+        data: [
+          { email: 'user50@example.com', name: 'User 50' },
+          { email: 'user100@example.com', name: 'User 100' },
+          { email: 'user_underscore@example.com', name: 'User Underscore' },
+        ],
+      })
+
+      // Test that % is treated as literal, not wildcard
+      const percentResult = await prisma.$transaction(async (tx) => {
+        return tx.user.findManyForUpdate({
+          where: { email: { contains: '50%' } },
+        })
+      })
+      // Should match emails containing literal "50%", not "50" followed by anything
+      expect(percentResult).toHaveLength(0)
+
+      // Test that _ is treated as literal, not wildcard
+      const underscoreResult = await prisma.$transaction(async (tx) => {
+        return tx.user.findManyForUpdate({
+          where: { email: { contains: '_underscore' } },
+        })
+      })
+      expect(underscoreResult).toHaveLength(1)
+      expect(underscoreResult[0].email).toBe('user_underscore@example.com')
+    })
+
+    it('handles empty in array', async () => {
+      await prisma.user.create({
+        data: { email: 'test@example.com', balance: 100 },
+      })
+
+      const result = await prisma.$transaction(async (tx) => {
+        return tx.user.findManyForUpdate({
+          where: { id: { in: [] } },
+        })
+      })
+
+      // Empty in array should return no results
+      expect(result).toHaveLength(0)
+    })
+
+    it('handles empty notIn array', async () => {
+      await prisma.user.createMany({
+        data: [
+          { email: 'user1@example.com', balance: 100 },
+          { email: 'user2@example.com', balance: 200 },
+        ],
+      })
+
+      const result = await prisma.$transaction(async (tx) => {
+        return tx.user.findManyForUpdate({
+          where: { id: { notIn: [] } },
+        })
+      })
+
+      // Empty notIn array should return all rows
+      expect(result).toHaveLength(2)
+    })
+
+    it('handles date values correctly', async () => {
+      const testDate = new Date('2024-01-01T00:00:00Z')
+      await prisma.user.create({
+        data: { email: 'date@example.com', createdAt: testDate },
+      })
+
+      const result = await prisma.$transaction(async (tx) => {
+        return tx.user.findUniqueForUpdate({
+          where: { email: 'date@example.com' },
+        })
+      })
+
+      expect(result).not.toBeNull()
+      expect(result?.email).toBe('date@example.com')
+      expect(result?.createdAt).toBeInstanceOf(Date)
+    })
+
+    it('throws error for unsupported mode: insensitive', async () => {
+      await prisma.user.create({
+        data: { email: 'test@example.com' },
+      })
+
+      await expect(
+        prisma.$transaction(async (tx) => {
+          return tx.user.findManyForUpdate({
+            where: { email: { contains: 'test', mode: 'insensitive' } },
+          })
+        })
+      ).rejects.toThrow(/Case-insensitive mode is not supported/)
     })
   })
 })

@@ -2,9 +2,28 @@ import type { LockOptions, ModelMeta, SqlQuery } from './types.js'
 
 /**
  * Quote a PostgreSQL identifier (table/column name)
+ * Implementation matches pg.escapeIdentifier (ported from PostgreSQL source)
+ * Escapes double quotes by doubling them: " becomes ""
  */
 export function quoteIdentifier(name: string): string {
   return `"${name.replace(/"/g, '""')}"`
+}
+
+/**
+ * Escape LIKE pattern wildcards to treat them as literal characters
+ * Escapes %, _, and \ characters to match Prisma's behavior
+ */
+export function escapeLikePattern(value: string): string {
+  return value.replace(/[%_\\]/g, '\\$&')
+}
+
+/**
+ * Get database field name for a model field
+ * Returns dbName if available, otherwise returns the field name
+ */
+function getDbFieldName(model: ModelMeta, fieldName: string): string {
+  const field = model.fields.find((f) => f.name === fieldName)
+  return field?.dbName ?? fieldName
 }
 
 /**
@@ -54,8 +73,7 @@ export function buildSelectClause(
   const selectedFields = Object.entries(select)
     .filter(([_, include]) => include)
     .map(([fieldName]) => {
-      const field = model.fields.find((f) => f.name === fieldName)
-      const dbName = field?.dbName ?? fieldName
+      const dbName = getDbFieldName(model, fieldName)
       return quoteIdentifier(dbName)
     })
 
@@ -84,8 +102,7 @@ export function buildOrderByClause(
 
   const clauses = orderByList.flatMap((item) =>
     Object.entries(item).map(([fieldName, direction]) => {
-      const field = model.fields.find((f) => f.name === fieldName)
-      const dbName = field?.dbName ?? fieldName
+      const dbName = getDbFieldName(model, fieldName)
       return `${quoteIdentifier(dbName)} ${direction.toUpperCase()}`
     })
   )
@@ -158,7 +175,7 @@ export function buildWhereClause(
       return // Skip non-scalar fields (relations)
     }
 
-    const dbName = field.dbName ?? key
+    const dbName = getDbFieldName(model, key)
     const quotedName = quoteIdentifier(dbName)
 
     if (value === null) {
@@ -197,10 +214,15 @@ export function buildWhereClause(
                   params.push(nestedVal)
                   break
                 case 'in':
-                  if (Array.isArray(nestedVal) && nestedVal.length > 0) {
-                    const placeholders = nestedVal.map(() => `$${paramIndex++}`).join(', ')
-                    conditions.push(`${quotedName} NOT IN (${placeholders})`)
-                    params.push(...nestedVal)
+                  if (Array.isArray(nestedVal)) {
+                    if (nestedVal.length === 0) {
+                      // Empty array in NOT IN means match all rows
+                      // Skip condition - no restriction
+                    } else {
+                      const placeholders = nestedVal.map(() => `$${paramIndex++}`).join(', ')
+                      conditions.push(`${quotedName} NOT IN (${placeholders})`)
+                      params.push(...nestedVal)
+                    }
                   }
                   break
               }
@@ -211,17 +233,27 @@ export function buildWhereClause(
           }
           break
         case 'in':
-          if (Array.isArray(opValue) && opValue.length > 0) {
-            const placeholders = opValue.map(() => `$${paramIndex++}`).join(', ')
-            conditions.push(`${quotedName} IN (${placeholders})`)
-            params.push(...opValue)
+          if (Array.isArray(opValue)) {
+            if (opValue.length === 0) {
+              // Empty array matches nothing (matches Prisma behavior)
+              conditions.push('FALSE')
+            } else {
+              const placeholders = opValue.map(() => `$${paramIndex++}`).join(', ')
+              conditions.push(`${quotedName} IN (${placeholders})`)
+              params.push(...opValue)
+            }
           }
           break
         case 'notIn':
-          if (Array.isArray(opValue) && opValue.length > 0) {
-            const placeholders = opValue.map(() => `$${paramIndex++}`).join(', ')
-            conditions.push(`${quotedName} NOT IN (${placeholders})`)
-            params.push(...opValue)
+          if (Array.isArray(opValue)) {
+            if (opValue.length === 0) {
+              // Empty notIn array matches all rows (matches Prisma behavior)
+              // Skip condition - no restriction
+            } else {
+              const placeholders = opValue.map(() => `$${paramIndex++}`).join(', ')
+              conditions.push(`${quotedName} NOT IN (${placeholders})`)
+              params.push(...opValue)
+            }
           }
           break
         case 'lt':
@@ -241,19 +273,34 @@ export function buildWhereClause(
           params.push(opValue)
           break
         case 'contains':
+          if (typeof opValue !== 'string') {
+            break
+          }
           conditions.push(`${quotedName} LIKE $${paramIndex++}`)
-          params.push(`%${opValue}%`)
+          params.push(`%${escapeLikePattern(opValue)}%`)
           break
         case 'startsWith':
+          if (typeof opValue !== 'string') {
+            break
+          }
           conditions.push(`${quotedName} LIKE $${paramIndex++}`)
-          params.push(`${opValue}%`)
+          params.push(`${escapeLikePattern(opValue)}%`)
           break
         case 'endsWith':
+          if (typeof opValue !== 'string') {
+            break
+          }
           conditions.push(`${quotedName} LIKE $${paramIndex++}`)
-          params.push(`%${opValue}`)
+          params.push(`%${escapeLikePattern(opValue)}`)
           break
         case 'mode':
-          // Ignore mode (case sensitivity) for now - would need ILIKE for insensitive
+          if (opValue === 'insensitive') {
+            throw new Error(
+              'Case-insensitive mode is not supported. ' +
+                'Use $queryRaw with ILIKE for case-insensitive matching, or use Prisma\'s standard query API.'
+            )
+          }
+          // Other mode values are ignored (default is case-sensitive)
           break
       }
     }

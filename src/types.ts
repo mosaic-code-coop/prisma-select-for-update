@@ -77,3 +77,19 @@ export interface ModelMeta {
   dbName: string | null
   fields: ModelField[]
 }
+
+/**
+ * Transaction client interface for Prisma extensions
+ * Transaction clients don't have $transaction method (can't nest transactions)
+ */
+export interface TransactionClient {
+  $queryRawUnsafe: <R>(sql: string, ...params: unknown[]) => Promise<R[]>
+}
+
+/**
+ * Extension context from Prisma.getExtensionContext
+ */
+export interface ExtensionContext {
+  $name: string
+  $parent: TransactionClient
+}

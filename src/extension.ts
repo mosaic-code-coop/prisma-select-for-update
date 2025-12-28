@@ -1,10 +1,12 @@
 import { Prisma } from '@prisma/client'
 import { buildSelectForUpdate } from './sql-builder.js'
 import type {
+  ExtensionContext,
   FindFirstForUpdateArgs,
   FindManyForUpdateArgs,
   FindUniqueForUpdateArgs,
   ModelMeta,
+  TransactionClient,
 } from './types.js'
 
 /**
@@ -72,6 +74,41 @@ function isTransactionClient(client: unknown): boolean {
 }
 
 /**
+ * Get and validate execution context from Prisma extension
+ * Extracts model name, validates transaction context, and returns model metadata
+ */
+function getExecutionContext(thisArg: unknown): {
+  client: TransactionClient
+  model: ModelMeta
+  modelName: string
+} {
+  const context = Prisma.getExtensionContext(thisArg) as ExtensionContext
+
+  const modelName = context.$name
+  if (!modelName) {
+    throw new Error('Could not determine model name from context')
+  }
+
+  const client = context.$parent
+
+  // Check if we're in a transaction
+  if (!isTransactionClient(client)) {
+    throw new Error(
+      'forUpdate methods must be called within a transaction. ' +
+        'Use prisma.$transaction(async (tx) => { await tx.model.findUniqueForUpdate(...) })'
+    )
+  }
+
+  if (!client?.$queryRawUnsafe) {
+    throw new Error('$queryRawUnsafe not available on client')
+  }
+
+  const model = getModelMeta(modelName)
+
+  return { client, model, modelName }
+}
+
+/**
  * Create the Prisma extension with forUpdate methods
  */
 export function withForUpdate() {
@@ -83,33 +120,8 @@ export function withForUpdate() {
           this: T,
           args: Args
         ): Promise<Prisma.Result<T, Args, 'findUnique'> | null> {
-          const context = Prisma.getExtensionContext(this) as {
-            $name: string
-            $parent: {
-              $queryRawUnsafe: <R>(sql: string, ...params: unknown[]) => Promise<R[]>
-            }
-          }
+          const { client, model } = getExecutionContext(this)
 
-          const modelName = context.$name
-          if (!modelName) {
-            throw new Error('Could not determine model name from context')
-          }
-
-          const client = context.$parent
-
-          // Check if we're in a transaction
-          if (!isTransactionClient(client)) {
-            throw new Error(
-              'findUniqueForUpdate must be called within a transaction. ' +
-                'Use prisma.$transaction(async (tx) => { await tx.model.findUniqueForUpdate(...) })'
-            )
-          }
-
-          if (!client?.$queryRawUnsafe) {
-            throw new Error('$queryRawUnsafe not available on client')
-          }
-
-          const model = getModelMeta(modelName)
           const { sql, params } = buildSelectForUpdate(model, {
             where: args.where as Record<string, unknown>,
             select: args.select as Record<string, boolean> | undefined,
@@ -133,33 +145,8 @@ export function withForUpdate() {
           this: T,
           args: Args = {} as Args
         ): Promise<Prisma.Result<T, Args, 'findFirst'> | null> {
-          const context = Prisma.getExtensionContext(this) as {
-            $name: string
-            $parent: {
-              $queryRawUnsafe: <R>(sql: string, ...params: unknown[]) => Promise<R[]>
-            }
-          }
+          const { client, model } = getExecutionContext(this)
 
-          const modelName = context.$name
-          if (!modelName) {
-            throw new Error('Could not determine model name from context')
-          }
-
-          const client = context.$parent
-
-          // Check if we're in a transaction
-          if (!isTransactionClient(client)) {
-            throw new Error(
-              'findFirstForUpdate must be called within a transaction. ' +
-                'Use prisma.$transaction(async (tx) => { await tx.model.findFirstForUpdate(...) })'
-            )
-          }
-
-          if (!client?.$queryRawUnsafe) {
-            throw new Error('$queryRawUnsafe not available on client')
-          }
-
-          const model = getModelMeta(modelName)
           const { sql, params } = buildSelectForUpdate(model, {
             where: args.where as Record<string, unknown> | undefined,
             select: args.select as Record<string, boolean> | undefined,
@@ -184,33 +171,8 @@ export function withForUpdate() {
           this: T,
           args: Args = {} as Args
         ): Promise<Prisma.Result<T, Args, 'findMany'>> {
-          const context = Prisma.getExtensionContext(this) as {
-            $name: string
-            $parent: {
-              $queryRawUnsafe: <R>(sql: string, ...params: unknown[]) => Promise<R[]>
-            }
-          }
+          const { client, model } = getExecutionContext(this)
 
-          const modelName = context.$name
-          if (!modelName) {
-            throw new Error('Could not determine model name from context')
-          }
-
-          const client = context.$parent
-
-          // Check if we're in a transaction
-          if (!isTransactionClient(client)) {
-            throw new Error(
-              'findManyForUpdate must be called within a transaction. ' +
-                'Use prisma.$transaction(async (tx) => { await tx.model.findManyForUpdate(...) })'
-            )
-          }
-
-          if (!client?.$queryRawUnsafe) {
-            throw new Error('$queryRawUnsafe not available on client')
-          }
-
-          const model = getModelMeta(modelName)
           const { sql, params } = buildSelectForUpdate(model, {
             where: args.where as Record<string, unknown> | undefined,
             select: args.select as Record<string, boolean> | undefined,
