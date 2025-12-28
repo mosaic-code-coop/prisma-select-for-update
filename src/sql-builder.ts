@@ -1,4 +1,4 @@
-import type { LockOptions, ModelMeta, SqlQuery } from './types.js'
+import type { LockMode, LockOptions, ModelMeta, SqlQuery } from './types.js'
 
 /**
  * Quote a PostgreSQL identifier (table/column name)
@@ -29,26 +29,16 @@ function getDbFieldName(model: ModelMeta, fieldName: string): string {
 /**
  * Get the SQL lock clause based on lock options
  */
+const LOCK_MODE_SQL: Record<LockMode, string> = {
+  ForUpdate: 'FOR UPDATE',
+  ForNoKeyUpdate: 'FOR NO KEY UPDATE',
+  ForShare: 'FOR SHARE',
+  ForKeyShare: 'FOR KEY SHARE',
+}
+
 export function buildLockClause(lock?: LockOptions): string {
   const mode = lock?.mode ?? 'ForNoKeyUpdate'
-
-  let lockSql: string
-  switch (mode) {
-    case 'ForUpdate':
-      lockSql = 'FOR UPDATE'
-      break
-    case 'ForNoKeyUpdate':
-      lockSql = 'FOR NO KEY UPDATE'
-      break
-    case 'ForShare':
-      lockSql = 'FOR SHARE'
-      break
-    case 'ForKeyShare':
-      lockSql = 'FOR KEY SHARE'
-      break
-    default:
-      lockSql = 'FOR NO KEY UPDATE'
-  }
+  let lockSql = LOCK_MODE_SQL[mode]
 
   if (lock?.noWait) {
     lockSql += ' NOWAIT'
