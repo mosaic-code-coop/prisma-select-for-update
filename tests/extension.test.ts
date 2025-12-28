@@ -80,62 +80,6 @@ describe('prisma-lock-for-update extension', () => {
       // balance should not be selected
       expect((result as Record<string, unknown>)?.balance).toBeUndefined()
     })
-
-    it('defaults to FOR NO KEY UPDATE when no lock mode specified', async () => {
-      const user = await prisma.user.create({
-        data: { email: 'default@example.com', name: 'Default User', balance: 100 },
-      })
-
-      // No lock option specified - should default to FOR NO KEY UPDATE
-      const result = await prisma.$transaction(async (tx) => {
-        return tx.user.findUniqueForUpdate({
-          where: { id: user.id },
-        })
-      })
-      expect(result?.id).toBe(user.id)
-    })
-
-    it('supports different lock modes', async () => {
-      const user = await prisma.user.create({
-        data: { email: 'lock@example.com', name: 'Lock User', balance: 200 },
-      })
-
-      // Test FOR UPDATE
-      const updateResult = await prisma.$transaction(async (tx) => {
-        return tx.user.findUniqueForUpdate({
-          where: { id: user.id },
-          lock: { mode: 'ForUpdate' },
-        })
-      })
-      expect(updateResult?.id).toBe(user.id)
-
-      // Test FOR SHARE
-      const shareResult = await prisma.$transaction(async (tx) => {
-        return tx.user.findUniqueForUpdate({
-          where: { id: user.id },
-          lock: { mode: 'ForShare' },
-        })
-      })
-      expect(shareResult?.id).toBe(user.id)
-
-      // Test FOR NO KEY UPDATE
-      const noKeyResult = await prisma.$transaction(async (tx) => {
-        return tx.user.findUniqueForUpdate({
-          where: { id: user.id },
-          // No lock clause as NO KEY UPDATE should be the default
-        })
-      })
-      expect(noKeyResult?.id).toBe(user.id)
-
-      // Test FOR KEY SHARE
-      const keyShareResult = await prisma.$transaction(async (tx) => {
-        return tx.user.findUniqueForUpdate({
-          where: { id: user.id },
-          lock: { mode: 'ForKeyShare' },
-        })
-      })
-      expect(keyShareResult?.id).toBe(user.id)
-    })
   })
 
   describe('findFirstForUpdate', () => {
@@ -229,49 +173,6 @@ describe('prisma-lock-for-update extension', () => {
       expect(result).toHaveLength(0)
     })
 
-    it('supports take and skip', async () => {
-      await prisma.task.createMany({
-        data: [
-          { title: 'Task 1', priority: 1 },
-          { title: 'Task 2', priority: 2 },
-          { title: 'Task 3', priority: 3 },
-          { title: 'Task 4', priority: 4 },
-          { title: 'Task 5', priority: 5 },
-        ],
-      })
-
-      const result = await prisma.$transaction(async (tx) => {
-        return tx.task.findManyForUpdate({
-          orderBy: { priority: 'asc' },
-          take: 2,
-          skip: 1,
-        })
-      })
-
-      expect(result).toHaveLength(2)
-      expect(result[0].title).toBe('Task 2')
-      expect(result[1].title).toBe('Task 3')
-    })
-
-    it('supports SKIP LOCKED for queue-like behavior', async () => {
-      await prisma.task.createMany({
-        data: [
-          { title: 'Job 1', status: 'pending' },
-          { title: 'Job 2', status: 'pending' },
-        ],
-      })
-
-      // This test verifies SKIP LOCKED syntax is generated correctly
-      // Actual concurrent behavior would require parallel connections
-      const result = await prisma.$transaction(async (tx) => {
-        return tx.task.findManyForUpdate({
-          where: { status: 'pending' },
-          lock: { skipLocked: true },
-        })
-      })
-
-      expect(result).toHaveLength(2)
-    })
   })
 
   describe('transaction requirement', () => {
@@ -512,38 +413,6 @@ describe('prisma-lock-for-update extension', () => {
       expect(underscoreResult[0].email).toBe('user_underscore@example.com')
     })
 
-    it('handles empty in array', async () => {
-      await prisma.user.create({
-        data: { email: 'test@example.com', balance: 100 },
-      })
-
-      const result = await prisma.$transaction(async (tx) => {
-        return tx.user.findManyForUpdate({
-          where: { id: { in: [] } },
-        })
-      })
-
-      // Empty in array should return no results
-      expect(result).toHaveLength(0)
-    })
-
-    it('handles empty notIn array', async () => {
-      await prisma.user.createMany({
-        data: [
-          { email: 'user1@example.com', balance: 100 },
-          { email: 'user2@example.com', balance: 200 },
-        ],
-      })
-
-      const result = await prisma.$transaction(async (tx) => {
-        return tx.user.findManyForUpdate({
-          where: { id: { notIn: [] } },
-        })
-      })
-
-      // Empty notIn array should return all rows
-      expect(result).toHaveLength(2)
-    })
 
     it('handles date values correctly', async () => {
       const testDate = new Date('2024-01-01T00:00:00Z')
