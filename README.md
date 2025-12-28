@@ -293,6 +293,20 @@ npm test
 npm run test:watch
 ```
 
+## Publishing
+
+To publish this package to npm:
+
+```bash
+# Build the package (runs automatically before publish)
+npm run build
+
+# Publish to npm
+npm publish
+```
+
+The `prepublishOnly` script ensures a clean build before publishing. Only the `dist` folder, `README.md`, and `LICENSE` are included in the published package.
+
 ## License
 
 MIT
