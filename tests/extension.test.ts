@@ -81,10 +81,33 @@ describe('prisma-lock-for-update extension', () => {
       expect((result as Record<string, unknown>)?.balance).toBeUndefined()
     })
 
+    it('defaults to FOR NO KEY UPDATE when no lock mode specified', async () => {
+      const user = await prisma.user.create({
+        data: { email: 'default@example.com', name: 'Default User', balance: 100 },
+      })
+
+      // No lock option specified - should default to FOR NO KEY UPDATE
+      const result = await prisma.$transaction(async (tx) => {
+        return tx.user.findUniqueForUpdate({
+          where: { id: user.id },
+        })
+      })
+      expect(result?.id).toBe(user.id)
+    })
+
     it('supports different lock modes', async () => {
       const user = await prisma.user.create({
         data: { email: 'lock@example.com', name: 'Lock User', balance: 200 },
       })
+
+      // Test FOR UPDATE
+      const updateResult = await prisma.$transaction(async (tx) => {
+        return tx.user.findUniqueForUpdate({
+          where: { id: user.id },
+          lock: { mode: 'ForUpdate' },
+        })
+      })
+      expect(updateResult?.id).toBe(user.id)
 
       // Test FOR SHARE
       const shareResult = await prisma.$transaction(async (tx) => {
@@ -99,7 +122,7 @@ describe('prisma-lock-for-update extension', () => {
       const noKeyResult = await prisma.$transaction(async (tx) => {
         return tx.user.findUniqueForUpdate({
           where: { id: user.id },
-          lock: { mode: 'ForNoKeyUpdate' },
+          // No lock clause as NO KEY UPDATE should be the default
         })
       })
       expect(noKeyResult?.id).toBe(user.id)

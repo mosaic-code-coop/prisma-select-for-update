@@ -66,7 +66,7 @@ const user = await prisma.$transaction(async (tx) => {
   return tx.user.findUniqueForUpdate({
     where: { id: 1 },
     select: { id: true, email: true }, // optional
-    lock: { mode: 'ForUpdate' }, // optional
+    lock: { mode: 'ForUpdate' }, // optional, defaults to ForNoKeyUpdate
   })
 })
 ```
@@ -105,7 +105,7 @@ const users = await prisma.$transaction(async (tx) => {
 
 ```typescript
 interface LockOptions {
-  /** Lock mode - defaults to 'ForUpdate' */
+  /** Lock mode - defaults to 'ForNoKeyUpdate' */
   mode?: 'ForUpdate' | 'ForNoKeyUpdate' | 'ForShare' | 'ForKeyShare'
   /** Fail immediately if row is locked (NOWAIT) */
   noWait?: boolean
@@ -116,8 +116,8 @@ interface LockOptions {
 
 #### Lock Modes
 
-- **`ForUpdate`** (default) - Exclusive lock, prevents other transactions from modifying or locking the row
-- **`ForNoKeyUpdate`** - Similar to `ForUpdate`, but allows other transactions to acquire `FOR KEY SHARE` locks
+- **`ForNoKeyUpdate`** (default) - Exclusive lock for non-key columns, allows other transactions to acquire `FOR KEY SHARE` locks. Less restrictive than `ForUpdate` and common for updates that don't modify key columns.
+- **`ForUpdate`** - Exclusive lock, prevents other transactions from modifying or locking the row
 - **`ForShare`** - Shared lock, allows other transactions to read but not modify
 - **`ForKeyShare`** - Weakest lock, allows other transactions to read and acquire `FOR KEY SHARE` locks
 

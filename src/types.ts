@@ -13,7 +13,7 @@ export type LockMode =
  * Lock options for FOR UPDATE queries
  */
 export interface LockOptions {
-  /** Lock mode - defaults to ForUpdate */
+  /** Lock mode - defaults to ForNoKeyUpdate */
   mode?: LockMode
   /** Fail immediately if row is locked (NOWAIT) */
   noWait?: boolean

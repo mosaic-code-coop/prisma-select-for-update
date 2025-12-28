@@ -53,9 +53,9 @@ describe('escapeLikePattern', () => {
 })
 
 describe('buildLockClause', () => {
-  it('defaults to FOR UPDATE', () => {
-    expect(buildLockClause()).toBe('FOR UPDATE')
-    expect(buildLockClause({})).toBe('FOR UPDATE')
+  it('defaults to FOR NO KEY UPDATE', () => {
+    expect(buildLockClause()).toBe('FOR NO KEY UPDATE')
+    expect(buildLockClause({})).toBe('FOR NO KEY UPDATE')
   })
 
   it('builds FOR UPDATE with options', () => {
@@ -80,7 +80,7 @@ describe('buildLockClause', () => {
   })
 
   it('prefers noWait over skipLocked when both are set', () => {
-    expect(buildLockClause({ noWait: true, skipLocked: true })).toBe('FOR UPDATE NOWAIT')
+    expect(buildLockClause({ noWait: true, skipLocked: true })).toBe('FOR NO KEY UPDATE NOWAIT')
   })
 })
 
@@ -319,7 +319,7 @@ describe('buildSelectForUpdate', () => {
     const result = buildSelectForUpdate(userModel, {
       where: { id: 1 },
     })
-    expect(result.sql).toBe('SELECT * FROM "User" WHERE "id" = $1 FOR UPDATE')
+    expect(result.sql).toBe('SELECT * FROM "User" WHERE "id" = $1 FOR NO KEY UPDATE')
     expect(result.params).toEqual([1])
   })
 
@@ -328,7 +328,7 @@ describe('buildSelectForUpdate', () => {
       where: { id: 1 },
       select: { id: true, email: true },
     })
-    expect(result.sql).toBe('SELECT "id", "email" FROM "User" WHERE "id" = $1 FOR UPDATE')
+    expect(result.sql).toBe('SELECT "id", "email" FROM "User" WHERE "id" = $1 FOR NO KEY UPDATE')
     expect(result.params).toEqual([1])
   })
 
@@ -338,7 +338,7 @@ describe('buildSelectForUpdate', () => {
       orderBy: { createdAt: 'desc' },
     })
     expect(result.sql).toBe(
-      'SELECT * FROM "User" WHERE "balance" > $1 ORDER BY "created_at" DESC FOR UPDATE'
+      'SELECT * FROM "User" WHERE "balance" > $1 ORDER BY "created_at" DESC FOR NO KEY UPDATE'
     )
     expect(result.params).toEqual([0])
   })
@@ -348,7 +348,7 @@ describe('buildSelectForUpdate', () => {
       take: 10,
       skip: 5,
     })
-    expect(result.sql).toBe('SELECT * FROM "User" LIMIT $1 OFFSET $2 FOR UPDATE')
+    expect(result.sql).toBe('SELECT * FROM "User" LIMIT $1 OFFSET $2 FOR NO KEY UPDATE')
     expect(result.params).toEqual([10, 5])
   })
 
@@ -383,6 +383,6 @@ describe('buildSelectForUpdate', () => {
     const result = buildSelectForUpdate(modelWithDbName, {
       where: { id: 1 },
     })
-    expect(result.sql).toBe('SELECT * FROM "users" WHERE "id" = $1 FOR UPDATE')
+    expect(result.sql).toBe('SELECT * FROM "users" WHERE "id" = $1 FOR NO KEY UPDATE')
   })
 })

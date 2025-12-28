@@ -30,7 +30,7 @@ function getDbFieldName(model: ModelMeta, fieldName: string): string {
  * Get the SQL lock clause based on lock options
  */
 export function buildLockClause(lock?: LockOptions): string {
-  const mode = lock?.mode ?? 'ForUpdate'
+  const mode = lock?.mode ?? 'ForNoKeyUpdate'
 
   let lockSql: string
   switch (mode) {
@@ -47,7 +47,7 @@ export function buildLockClause(lock?: LockOptions): string {
       lockSql = 'FOR KEY SHARE'
       break
     default:
-      lockSql = 'FOR UPDATE'
+      lockSql = 'FOR NO KEY UPDATE'
   }
 
   if (lock?.noWait) {
