@@ -1,4 +1,4 @@
-# prisma-lock-for-update
+# prisma-select-for-update
 
 A Prisma v7 extension that adds `SELECT ... FOR UPDATE` row locking functionality for PostgreSQL databases. This extension provides type-safe methods to lock rows during transactions, preventing concurrent modifications.
 
@@ -13,7 +13,7 @@ A Prisma v7 extension that adds `SELECT ... FOR UPDATE` row locking functionalit
 ## Installation
 
 ```bash
-npm install prisma-lock-for-update
+npm install prisma-select-for-update
 ```
 
 **Peer Dependencies:**
@@ -26,7 +26,7 @@ npm install prisma-lock-for-update
 import { PrismaClient } from '@prisma/client'
 import { PrismaPg } from '@prisma/adapter-pg'
 import pg from 'pg'
-import { withForUpdate } from 'prisma-lock-for-update'
+import { withForUpdate } from 'prisma-select-for-update'
 
 const { Pool } = pg
 const pool = new Pool({ connectionString: process.env.DATABASE_URL })
@@ -309,7 +309,7 @@ The `prepublishOnly` script ensures a clean build before publishing. Only the `d
 
 ## License
 
-MIT
+[Do No Harm](https://github.com/raisely/NoHarm)
 
 ## Related
 
