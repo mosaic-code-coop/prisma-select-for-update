@@ -25,7 +25,12 @@
     "db:down": "docker compose down",
     "db:push": "prisma db push",
     "db:generate": "prisma generate",
-    "db:setup": "npm run db:up && sleep 2 && npm run db:push"
+    "db:setup": "npm run db:up && sleep 2 && npm run db:push",
+    "changelog": "conventional-changelog -p angular -i CHANGELOG.md -s",
+    "release:patch": "npm run changelog && git add CHANGELOG.md && git commit -m \"chore: update changelog\" && npm version patch && git push --follow-tags && npm run build && npm publish",
+    "release:minor": "npm run changelog && git add CHANGELOG.md && git commit -m \"chore: update changelog\" && npm version minor && git push --follow-tags && npm run build && npm publish",
+    "release:major": "npm run changelog && git add CHANGELOG.md && git commit -m \"chore: update changelog\" && npm version major && git push --follow-tags && npm run build && npm publish",
+    "release:dry": "npm run changelog -- --dry-run"
   },
   "engines": {
     "node": ">=18.18.0"
@@ -36,12 +41,18 @@
     "LICENSE"
   ],
   "peerDependencies": {
-    "@prisma/client": "^7.0.0"
+    "@prisma/adapter-pg": "^7.0.0",
+    "@prisma/client": "^7.0.0",
+    "pg": "^8.0.0"
   },
   "devDependencies": {
+    "@prisma/adapter-pg": "^7.2.0",
     "@prisma/client": "^7.0.0",
     "@types/node": "^25.0.3",
     "@types/pg": "^8.16.0",
+    "conventional-changelog-cli": "^5.0.0",
+    "dotenv": "^17.2.3",
+    "pg": "^8.16.3",
     "prisma": "^7.0.0",
     "typescript": "^5.7.0",
     "vitest": "^2.1.0"
@@ -53,7 +64,7 @@
     "select-for-update",
     "postgresql"
   ],
-  "license": "MIT",
+  "license": "SEE LICENSE IN LICENSE",
   "packageManager": "npm@11.6.2",
   "repository": {
     "type": "git",
@@ -63,10 +74,5 @@
   "bugs": {
     "url": "https://github.com/mosaic-sunrise/prisma-select-for-update/issues"
   },
-  "author": "mosaic-sunrise",
-  "dependencies": {
-    "@prisma/adapter-pg": "^7.2.0",
-    "dotenv": "^17.2.3",
-    "pg": "^8.16.3"
-  }
+  "author": "mosaic-sunrise"
 }
