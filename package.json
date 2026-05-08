@@ -11,9 +11,6 @@
       "types": "./dist/index.d.ts"
     }
   },
-  "publishConfig": {
-    "access": "public"
-  },
   "scripts": {
     "clean": "rm -rf dist",
     "build": "tsc",
@@ -64,7 +61,7 @@
     "select-for-update",
     "postgresql"
   ],
-  "license": "SEE LICENSE IN LICENSE",
+  "license": "NoHarm",
   "packageManager": "npm@11.6.2",
   "repository": {
     "type": "git",
@@ -74,5 +71,5 @@
   "bugs": {
     "url": "https://github.com/mosaic-sunrise/prisma-select-for-update/issues"
   },
-  "author": "mosaic-sunrise"
+  "author": "Chris Jensen <2920476+chrisjensen@users.noreply.github.com> (https://github.com/chrisjensen)"
 }
