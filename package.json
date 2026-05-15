@@ -1,6 +1,9 @@
 {
-  "name": "prisma-select-for-update",
+  "name": "@mosaic-code/prisma-select-for-update",
   "version": "0.1.0",
+  "publishConfig": {
+    "access": "public"
+  },
   "description": "Prisma v7 extension for SELECT ... FOR UPDATE row locking",
   "type": "module",
   "main": "dist/index.js",
@@ -65,11 +68,11 @@
   "packageManager": "npm@11.6.2",
   "repository": {
     "type": "git",
-    "url": "https://github.com/mosaic-sunrise/prisma-select-for-update.git"
+    "url": "git+https://github.com/mosaic-code-coop/prisma-select-for-update.git"
   },
-  "homepage": "https://github.com/mosaic-sunrise/prisma-select-for-update#readme",
+  "homepage": "https://github.com/mosaic-code-coop/prisma-select-for-update#readme",
   "bugs": {
-    "url": "https://github.com/mosaic-sunrise/prisma-select-for-update/issues"
+    "url": "https://github.com/mosaic-code-coop/prisma-select-for-update/issues"
   },
   "author": "Chris Jensen <2920476+chrisjensen@users.noreply.github.com> (https://github.com/chrisjensen)"
 }
