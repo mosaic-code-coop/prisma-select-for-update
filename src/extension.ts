@@ -109,89 +109,100 @@ function getExecutionContext(thisArg: unknown): {
 }
 
 /**
- * Create the Prisma extension with forUpdate methods
+ * Create the Prisma extension with forUpdate methods.
+ *
+ * Uses the closure form `defineExtension((client) => client.$extends({...}))`
+ * rather than the object form `defineExtension({...})`. The closure form
+ * preserves the input client's concrete type through the extension, so model
+ * types like `prisma.user.findMany()` keep their generated `User[]` shape
+ * instead of collapsing to `any[]`. With the object form, Prisma can't bind
+ * the `$allModels` methods to a specific client type at definition time and
+ * widens the `extArgs` model parameter to `unknown`, which propagates as
+ * `any` to every model when consumers call `client.$extends(withForUpdate())`.
  */
 export function withForUpdate() {
-  return Prisma.defineExtension({
-    name: 'prisma-lock-for-update',
-    model: {
-      $allModels: {
-        async findUniqueForUpdate<T, Args extends FindUniqueForUpdateArgs<T>>(
-          this: T,
-          args: Args
-        ): Promise<Prisma.Result<T, Args, 'findUnique'> | null> {
-          const { client, model } = getExecutionContext(this)
+  return Prisma.defineExtension((client) =>
+    client.$extends({
+      name: 'prisma-lock-for-update',
+      model: {
+        $allModels: {
+          async findUniqueForUpdate<T, Args extends FindUniqueForUpdateArgs<T>>(
+            this: T,
+            args: Args
+          ): Promise<Prisma.Result<T, Args, 'findUnique'> | null> {
+            const { client, model } = getExecutionContext(this)
 
-          const { sql, params } = buildSelectForUpdate(model, {
-            where: args.where as Record<string, unknown>,
-            select: args.select as Record<string, boolean> | undefined,
-            lock: args.lock,
-            take: 1, // findUnique should return at most 1 row
-          })
+            const { sql, params } = buildSelectForUpdate(model, {
+              where: args.where as Record<string, unknown>,
+              select: args.select as Record<string, boolean> | undefined,
+              lock: args.lock,
+              take: 1, // findUnique should return at most 1 row
+            })
 
-          const results = await client.$queryRawUnsafe<Record<string, unknown>>(
-            sql,
-            ...params
-          )
+            const results = await client.$queryRawUnsafe<Record<string, unknown>>(
+              sql,
+              ...params
+            )
 
-          if (results.length === 0) {
-            return null
-          }
+            if (results.length === 0) {
+              return null
+            }
 
-          return transformResult(results[0], model) as Prisma.Result<T, Args, 'findUnique'>
-        },
+            return transformResult(results[0], model) as Prisma.Result<T, Args, 'findUnique'>
+          },
 
-        async findFirstForUpdate<T, Args extends FindFirstForUpdateArgs<T>>(
-          this: T,
-          args: Args = {} as Args
-        ): Promise<Prisma.Result<T, Args, 'findFirst'> | null> {
-          const { client, model } = getExecutionContext(this)
+          async findFirstForUpdate<T, Args extends FindFirstForUpdateArgs<T>>(
+            this: T,
+            args: Args = {} as Args
+          ): Promise<Prisma.Result<T, Args, 'findFirst'> | null> {
+            const { client, model } = getExecutionContext(this)
 
-          const { sql, params } = buildSelectForUpdate(model, {
-            where: args.where as Record<string, unknown> | undefined,
-            select: args.select as Record<string, boolean> | undefined,
-            orderBy: args.orderBy as Record<string, 'asc' | 'desc'> | undefined,
-            lock: args.lock,
-            take: 1, // findFirst returns at most 1 row
-          })
+            const { sql, params } = buildSelectForUpdate(model, {
+              where: args.where as Record<string, unknown> | undefined,
+              select: args.select as Record<string, boolean> | undefined,
+              orderBy: args.orderBy as Record<string, 'asc' | 'desc'> | undefined,
+              lock: args.lock,
+              take: 1, // findFirst returns at most 1 row
+            })
 
-          const results = await client.$queryRawUnsafe<Record<string, unknown>>(
-            sql,
-            ...params
-          )
+            const results = await client.$queryRawUnsafe<Record<string, unknown>>(
+              sql,
+              ...params
+            )
 
-          if (results.length === 0) {
-            return null
-          }
+            if (results.length === 0) {
+              return null
+            }
 
-          return transformResult(results[0], model) as Prisma.Result<T, Args, 'findFirst'>
-        },
+            return transformResult(results[0], model) as Prisma.Result<T, Args, 'findFirst'>
+          },
 
-        async findManyForUpdate<T, Args extends FindManyForUpdateArgs<T>>(
-          this: T,
-          args: Args = {} as Args
-        ): Promise<Prisma.Result<T, Args, 'findMany'>> {
-          const { client, model } = getExecutionContext(this)
+          async findManyForUpdate<T, Args extends FindManyForUpdateArgs<T>>(
+            this: T,
+            args: Args = {} as Args
+          ): Promise<Prisma.Result<T, Args, 'findMany'>> {
+            const { client, model } = getExecutionContext(this)
 
-          const { sql, params } = buildSelectForUpdate(model, {
-            where: args.where as Record<string, unknown> | undefined,
-            select: args.select as Record<string, boolean> | undefined,
-            orderBy: args.orderBy as Record<string, 'asc' | 'desc'> | undefined,
-            take: args.take,
-            skip: args.skip,
-            lock: args.lock,
-          })
+            const { sql, params } = buildSelectForUpdate(model, {
+              where: args.where as Record<string, unknown> | undefined,
+              select: args.select as Record<string, boolean> | undefined,
+              orderBy: args.orderBy as Record<string, 'asc' | 'desc'> | undefined,
+              take: args.take,
+              skip: args.skip,
+              lock: args.lock,
+            })
 
-          const results = await client.$queryRawUnsafe<Record<string, unknown>>(
-            sql,
-            ...params
-          )
+            const results = await client.$queryRawUnsafe<Record<string, unknown>>(
+              sql,
+              ...params
+            )
 
-          return results.map((r) =>
-            transformResult(r, model)
-          ) as Prisma.Result<T, Args, 'findMany'>
+            return results.map((r) =>
+              transformResult(r, model)
+            ) as Prisma.Result<T, Args, 'findMany'>
+          },
         },
       },
-    },
-  })
+    })
+  )
 }
