@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeAll, afterAll, beforeEach } from 'vitest'
-import { PrismaClient } from '@prisma/client'
+import { PrismaClient, Prisma } from '@prisma/client'
 import { PrismaPg } from '@prisma/adapter-pg'
 import pg from 'pg'
 import { withForUpdate } from '../src/index.js'
@@ -15,6 +15,21 @@ const pool = new Pool({ connectionString: DATABASE_URL })
 const adapter = new PrismaPg(pool)
 const basePrisma = new PrismaClient({ adapter })
 const prisma = basePrisma.$extends(withForUpdate())
+
+// A trivial query-component extension, mirroring how real-world layers (e.g.
+// deadlock detection) wrap withForUpdate(). Stacking any extension above
+// withForUpdate() used to make the transaction gate throw on Prisma >=7.8.
+const passthroughExtension = Prisma.defineExtension({
+  name: 'test-passthrough',
+  query: {
+    $allModels: {
+      async $allOperations({ args, query }) {
+        return query(args)
+      },
+    },
+  },
+})
+const stackedPrisma = basePrisma.$extends(withForUpdate()).$extends(passthroughExtension)
 
 describe('prisma-lock-for-update extension', () => {
   beforeAll(async () => {
@@ -201,6 +216,66 @@ describe('prisma-lock-for-update extension', () => {
 
       await expect(prisma.task.findManyForUpdate({}))
         .rejects.toThrow(/must be called within a transaction/)
+    })
+  })
+
+  describe('extension stacking (regression)', () => {
+    it('locks inside $transaction when another extension is stacked above withForUpdate', async () => {
+      const user = await stackedPrisma.user.create({
+        data: { email: 'stacked@example.com', balance: 100 },
+      })
+
+      // Coordinate two transactions to prove the lock is genuinely held, not a
+      // no-op. tx A locks the row; tx B with NOWAIT must fail immediately.
+      let releaseLock: () => void
+      const lockHeld = new Promise<void>((resolve) => {
+        releaseLock = resolve
+      })
+      let lockAcquired: () => void
+      const lockAcquiredPromise = new Promise<void>((resolve) => {
+        lockAcquired = resolve
+      })
+
+      const lockPromise = stackedPrisma.$transaction(async (tx) => {
+        const locked = await tx.user.findUniqueForUpdate({ where: { id: user.id } })
+        lockAcquired!()
+        await lockHeld
+        return locked
+      })
+
+      await lockAcquiredPromise
+
+      let nowaitError: Error | undefined
+      try {
+        await stackedPrisma.$transaction(async (tx) => {
+          return tx.user.findUniqueForUpdate({
+            where: { id: user.id },
+            lock: { noWait: true },
+          })
+        })
+      } catch (e) {
+        nowaitError = e as Error
+      }
+
+      releaseLock!()
+
+      const locked = await lockPromise
+      expect(locked?.id).toBe(user.id)
+      expect(locked?.balance).toBe(100)
+
+      // The lock was real: the NOWAIT attempt failed to obtain it.
+      expect(nowaitError).toBeDefined()
+      expect(nowaitError?.message).toMatch(/could not obtain lock|lock.*not.*available/i)
+    })
+
+    it('still throws outside a transaction when stacked', async () => {
+      const user = await stackedPrisma.user.create({
+        data: { email: 'stacked-outside@example.com' },
+      })
+
+      await expect(
+        stackedPrisma.user.findUniqueForUpdate({ where: { id: user.id } })
+      ).rejects.toThrow(/must be called within a transaction/)
     })
   })
 

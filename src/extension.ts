@@ -64,13 +64,21 @@ function transformResult<T>(
 }
 
 /**
- * Check if we're in a transaction context
- * Transaction clients do NOT have $transaction method (can't nest transactions)
+ * Check if we're in a transaction context.
+ *
+ * Prisma builds the interactive-transaction client from `ITXClientDenyList`,
+ * which strips `$connect` / `$disconnect` / `$extends` (you cannot connect,
+ * disconnect, or extend mid-transaction). We key on `$connect`/`$disconnect`
+ * rather than `$transaction`: Prisma >=7.8 dropped `$transaction` from the deny
+ * list, so it leaks onto the `$parent` surface an inner extension sees when
+ * another extension is stacked above `withForUpdate()` — which made the old
+ * `!$transaction` heuristic throw inside real transactions. `$connect` and
+ * `$disconnect` stay stripped across 6.8/7.2/7.8 and in every layering
+ * (unstacked, stacked, proxy-wrapped), so they are the robust signal.
  */
 function isTransactionClient(client: unknown): boolean {
-  // Transaction clients don't have $transaction method
-  // Base client has $transaction, transaction client doesn't
-  return !((client as Record<string, unknown>)?.$transaction)
+  const c = client as Record<string, unknown>
+  return typeof c?.$connect !== 'function' && typeof c?.$disconnect !== 'function'
 }
 
 /**

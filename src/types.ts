@@ -79,8 +79,8 @@ export interface ModelMeta {
 }
 
 /**
- * Transaction client interface for Prisma extensions
- * Transaction clients don't have $transaction method (can't nest transactions)
+ * Transaction client interface for Prisma extensions.
+ * Only the raw-query method is needed to issue `SELECT ... FOR UPDATE`.
  */
 export interface TransactionClient {
   $queryRawUnsafe: <R>(sql: string, ...params: unknown[]) => Promise<R[]>
