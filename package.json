@@ -26,11 +26,11 @@
     "db:push": "prisma db push",
     "db:generate": "prisma generate",
     "db:setup": "npm run db:up && sleep 2 && npm run db:push",
-    "changelog": "conventional-changelog -p angular -i CHANGELOG.md -s",
-    "release:patch": "npm run changelog && git add CHANGELOG.md && git commit -m \"chore: update changelog\" && npm version patch && git push --follow-tags && npm run build && npm publish",
-    "release:minor": "npm run changelog && git add CHANGELOG.md && git commit -m \"chore: update changelog\" && npm version minor && git push --follow-tags && npm run build && npm publish",
-    "release:major": "npm run changelog && git add CHANGELOG.md && git commit -m \"chore: update changelog\" && npm version major && git push --follow-tags && npm run build && npm publish",
-    "release:dry": "npm run changelog -- --dry-run"
+    "release:patch": "npm version patch && git push --follow-tags && npm run build && npm publish",
+    "release:minor": "npm version minor && git push --follow-tags && npm run build && npm publish",
+    "release:major": "npm version major && git push --follow-tags && npm run build && npm publish",
+    "release:dry": "conventional-changelog -p conventionalcommits -u",
+    "version": "conventional-changelog -p conventionalcommits -i CHANGELOG.md -s && git add CHANGELOG.md"
   },
   "engines": {
     "node": ">=18.18.0",
